@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css"
+        integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA=="
+        crossorigin=""/>
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/leaflet-pulse-icon@0.1.0/src/L.Icon.Pulse.css" />
+
+  <script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"
+          integrity="sha512-QVftwZFqvtRNi0ZyCtsznlKSWOStnDORoefr1enyq5mVL4tmKB3S/EnC3rRJcxCPavG10IcrVGSmPh6Qw5lwrg=="
+          crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-pulse-icon@0.1.0/src/L.Icon.Pulse.js"></script>
+
+
+  <style>
+    #mapid {
+      height: 100%;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .info-card {
+      background: #ffffff;
+      position: absolute;
+      width: auto;
+      height: auto;
+      padding: 10px;
+      top: 0;
+      right: 0;
+      z-index: 10000;
+    }
+
+  </style>
+</head>
+<body>
+<div id="mapid"></div>
+<div class="info-card">
+  <div id="content"></div>
+</div>
+
+<script>
+  var controlledByFano = [
+    // 'ET030615',
+  ];
+
+  function mapstyle(feature) {
+    return {
+      fillColor: "#fff",
+      color: "#000",
+      weight: '1',
+      fillOpacity: 1
+    };
+  }
+
+  const greenIcon = L.icon.pulse({ color: "green", fillColor: "green", animate: true});
+  const redIcon = L.icon.pulse({ color: "red", fillColor: "red", animate: true});
+
+  const svgIconRed = L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg">
+  <path d="M0 0h24v24H0z" fill="none"/>
+  <rect width="8.672" height="11.274" ry="0"
+        fill="red" fill-rule="evenodd" stroke="#000109"
+        stroke-width=".309" paint-order="fill markers stroke"/>
+</svg>`,
+    className: "",
+    iconSize: [20, 20],
+  });
+
+  const svgIconGreen = L.divIcon({
+    html: `<svg xmlns="http://www.w3.org/2000/svg">
+  <path d="M0 0h24v24H0z" fill="none"/>
+  <rect width="8.672" height="11.274" ry="0"
+        fill="green" fill-rule="evenodd" stroke="#000109"
+        stroke-width=".309" paint-order="fill markers stroke"/>
+</svg>`,
+    className: "",
+    iconSize: [20, 20],
+  });
+
+  var basicMap = L.map('mapid', {
+    attributionControl: false,
+    zoomControl: false,
+    minZoom: 6,
+    maxZoom: 11,
+  }).setView([11.396653233004118, 38.236747025558763], 5,);
+
+  const regionFilter = function (feature) {
+    return true;//feature.properties.ADM1_EN === 'Amhara';
+  };
+
+  const keys_to_keep = ['T_NAME', 'ADM3_EN', 'ADM2_EN', 'ADM1_EN', 'POINT_X', 'POINT_Y'];
+
+  const redux = list => Object.fromEntries(
+    keys_to_keep.map(k => [k, list[k]])
+  );
+
+  const addToMap = function (data) {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: false,
+    }).addTo(basicMap);
+
+    L.geoJSON(data, {
+      style: mapstyle,
+      filter: regionFilter,
+
+      onEachFeature: function (feature, layer) {
+        // layer.bindTooltip(feature.properties.T_NAME).openTooltip();
+        layer.setIcon(controlledByFano.includes(feature.properties.ADM3_PCODE) ? greenIcon : svgIconRed);
+
+        layer.on('mouseover', function (event) {
+          document.getElementById("content").innerHTML = '<pre>' + JSON.stringify(redux(feature.properties), null, ' ').replace(/[\{\}"]/g, '') + '</pre>';
+
+          console.log(event);
+        });
+
+        /*   var info = "<h3>" + feature.properties.T_NAME + "</CircleMarker></h3>" +
+             "<span>Woreda: <strong>" + feature.properties.ADM3_EN + "</strong></span>" +
+             "<div>Zone: <strong>" + feature.properties.ADM2_EN + "</strong></div>" +
+             "<div>Region: <strong>" + feature.properties.ADM1_EN + "</strong></div>";
+
+           layer.bindPopup(info);*/
+        // layer.bindPopup('<pre>' + JSON.stringify(redux(feature.properties), null, ' ').replace(/[\{\}"]/g, '') + '</pre>');
+
+
+      },
+
+    }).addTo(basicMap);
+
+
+    basicMap.on('zoomend', function () {
+      var currentZoom = basicMap.getZoom();
+      basicMap.eachLayer((l) => {
+        if (l instanceof L.Marker && basicMap.getBounds().contains(l.getLatLng())) {
+          // if (currentZoom >= 10) {
+          //   l.setIcon(svgIconGreen);
+          // } else {
+          //   l.setIcon(svgIconRed);
+          // }
+        }
+      })
+
+
+    })
+  };
+
+  fetch('geoBoundaries-ETH-ADM2.geojson')
+    .then(response => response.json())
+    .then(data => addToMap(data))
+    .catch(error => console.log(error));
+
+
+</script>
+</body>
+</html>
